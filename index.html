@@ -106,7 +106,7 @@ body { margin: 0; padding: 0; }
 		 	    stops: [
 					 [0,0],
 					 [1,.2],
-					 [50,.6],
+					 [50,.8],
 					[8000,1]
 					 ]
 			}
@@ -120,6 +120,14 @@ body { margin: 0; padding: 0; }
 			 ]
 			 	    }
 	 
+	 
+					var radiusZoomScale = {
+						'base': 4,
+						'stops': [
+						[4, 4],
+						[22, 200]
+						]
+					}
 					var colorScale={
 						property:cats[0],
 						stops:[
@@ -142,7 +150,7 @@ body { margin: 0; padding: 0; }
    		},
    		'paint': {
 			"circle-opacity":opacityScale,
-			'circle-radius':6,//radiusScale,
+			'circle-radius':radiusZoomScale,//4,//radiusScale,
 			"circle-color":colorScale
    		}
    		});
