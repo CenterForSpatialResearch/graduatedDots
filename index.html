@@ -7,34 +7,64 @@
 <link href="https://api.mapbox.com/mapbox-gl-js/v2.8.1/mapbox-gl.css" rel="stylesheet">
 <script src="https://api.mapbox.com/mapbox-gl-js/v2.8.1/mapbox-gl.js"></script>
 <script src="d3.js"></script>
-
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;900&display=swap" rel="stylesheet">
 <style>
-body { margin: 0; padding: 0; }
+body { margin: 0; padding: 0; font-family:"Roboto"; }
 #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+#key{padding:20px;}
+#info{padding:20px;}
 </style>
 </head>
 <body>
+	<div id="info">Grided Population Vaccination Rate Map - graduated symbol Rankin hybrid test<br><br>
+		population density is size of circle, each circle is 15 minute or 30km<br><br>
+	same colors as NYT article here: https://www.nytimes.com/interactive/2020/us/covid-19-vaccine-doses.html<br>
+	vaccination data from: https://data.cdc.gov/Vaccinations/COVID-19-Vaccinations-in-the-United-States-County/8xkx-amqh/data<br>
+	population density data from: https://sedac.ciesin.columbia.edu/data/set/gpw-v4-population-density-rev11/data-download
+	</div>
+	<div id="key"></div>
+	
 <div id="map"></div>
 <script>
+
 	var cats = ["Series_Complete_Pop_Pct","Booster_Doses_Vax_Pct"]
-	
-	var colors = {"_30-":"#2f7264",
-				"30-40":"#6fa194",
-				"40-50": "#b3d0c7",
-				"50-60": "#efdbcb",
-				"60-70": "#dba788",
-				"70+":"#c77560"}
-	
+	var currentCat = cats[0]
+	var colors = {"_30":"#c77560",
+				"_40":"#dba788",
+				"_50": "#efdbcb",
+				"_60": "#b3d0c7",
+				"_70": "#6fa194",
+				"_":"#2f7264"}
+				d3.select("#key").append("div").html(currentCat)
+	for(var c in colors){
+		var block = 	d3.select("#key").append("div").style("display","inline-block")//.html(c.replace("_",""))
+
+	//block.append("div").html(c.replace("_",""))
+	block.append("div").style("height","20px").style("width","60px").style("background-color",colors[c])
+
+	}
+	var blockLabel = d3.select("#key").append("div")
+	blockLabel.append("div").html("").style("width","50px").style("display","inline-block")
+	for(var c in colors){
+		//.html(c.replace("_",""))
+
+	blockLabel.append("div").html(c.replace("_","")+"%").style("width","60px").style("display","inline-block")
+		
+	//block.append("div").style("height","20px").style("width","20px").style("background-color",colors[c])
+
+	}
 	Promise.all([d3.csv("COVID-19_Vaccinations_in_the_United_States_County (1).csv"),d3.json("dots.geojson")])
 	.then(function(data){
-		console.log(data)
+		//console.log(data)
 		var dots = data[1]
 		var vaccines = data[0]
 		
 		var vaccineDictionary = vaccineByFIPS(vaccines)
-		console.log(vaccineDictionary)
+		//console.log(vaccineDictionary)
 		var joinedData = joinRatesToDots(dots,vaccineDictionary)
-		console.log(joinedData)
+		//console.log(joinedData)
 		
 		drawMap(joinedData)
 	})
@@ -82,8 +112,8 @@ body { margin: 0; padding: 0; }
 	    const map = new mapboxgl.Map({
 	        container: 'map', // container ID
 	        style: 'mapbox://styles/c4sr-gsapp/cl25fr4wl001i15qnxmelv27v', // custom style url from https://studio.mapbox.com/
-	        center: [-95.651,39.646], // starting position
-	        zoom: 4 // starting zoom
+	        center: [-95.651,41.646], // starting position
+	        zoom: 3.8 // starting zoom
 	    });
 		map.on("load",function(){
 		
@@ -114,8 +144,8 @@ body { margin: 0; padding: 0; }
  	    property: "DN",
  	    stops: [
 			 [0,0],
-			 [10,2],
-			 [50,4],
+			// [10,1],
+			 [10,3],
 			[8000,6]
 			 ]
 			 	    }
@@ -129,7 +159,7 @@ body { margin: 0; padding: 0; }
 						]
 					}
 					var colorScale={
-						property:cats[0],
+						property:currentCat,
 						stops:[
 							[0,"#c77560"],
  							[30, "#dba788"],
