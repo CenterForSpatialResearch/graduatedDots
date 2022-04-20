@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>graduated</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.8.1/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.8.1/mapbox-gl.js"></script>
+<script src="d3.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;900&display=swap" rel="stylesheet">
+<style>
+body { margin: 0; padding: 0; font-family:"Roboto"; }
+#map { position: absolute; top: 0; bottom: 0; width: 100%; z-index:-1;}
+#key{padding:20px; position:fixed; left:10px;bottom:120px;}
+#circleKey{padding:20px; position:fixed; left:0px;bottom:0px;}
+#info{padding:20px; width:800px; background-color:rgba(255,255,255,.8); z-index:999;}
+a{
+	color:#000;
+}
+#popup{
+	position:fixed; left:0px;top:100px;padding:20px;
+}
+</style>
+</head>
+<body>
+	<div id="info">
+		A circle is place at the center of every 30km by 30km area(15 minutes). The size of the circle is determiend by population density within that square area. Population density is measured as "number of
+persons per square kilometer".
+		
+	 <!-- same colors as <a href="https://www.nytimes.com/interactive/2020/us/covid-19-vaccine-doses.html" target="blank">NYT article</a> -->
+	<a href="https://data.cdc.gov/Vaccinations/COVID-19-Vaccinations-in-the-United-States-County/8xkx-amqh/data" target="blank"> <br>vaccination data is for 4/19 and downloaded 4/20</a><br>
+	 <a href="https://sedac.ciesin.columbia.edu/data/set/gpw-v4-population-density-rev11/data-download" target="blank">population density data is for 2020</a> 
+	</div>
+	<div id="circleKey"></div>
+	<div id="key"></div>
+	<div id="popup">rollover circles</div>
+<div id="map"></div>
+<script>
+	
+	var radiusStops = [
+			 [0,0],
+			 [10,2],
+			[1000,6],
+		[10000,10]
+			 ]
+	
+			 for(var r in radiusStops){
+			 	console.log(r)
+				 var density = radiusStops[r][0]
+				 var radius = radiusStops[r][1]
+				 if(density!=0){
+					 var stopDiv = d3.select("#circleKey").append("div")
+				 
+					 stopDiv.append("div").html(density+" persons per sq km").style("display","inline-block")
+					 .style("margin","10px")
+				 
+					 stopDiv.append("div").style("height",radius*2+"px").style("width",radius*2+"px")
+					 .style("border-radius",radius+"px")
+					 .style('background-color',"black")
+					 .style('border',"1px solid black")
+					 .style("display","inline-block")
+					 .style("vertical-align","center")
+					 .style("margin","0px")
+				 }
+				 
+			 }
+
+
+	var cats = ["Series_Complete_Pop_Pct","Booster_Doses_Vax_Pct"]
+	var currentCat = cats[1]
+	var colors = {"_30":"#c77560",
+				"_40":"#dba788",
+				"_50": "#efdbcb",
+				"_60": "#b3d0c7",
+				"_70": "#6fa194",
+				"_":"#2f7264"}
+				d3.select("#key").append("div").html("showing data column: <br>"+currentCat)
+				.style("font-size","36px")
+				.style("margin-bottom","10px")
+				
+	for(var c in colors){
+		var block = 	d3.select("#key").append("div").style("display","inline-block")//.html(c.replace("_",""))
+		block.append("div").style("height","20px").style("width","60px").style("background-color",colors[c])
+	}
+	var blockLabel = d3.select("#key").append("div")
+	blockLabel.append("div").html("").style("width","50px").style("display","inline-block")
+	for(var c in colors){
+		if(c!="_"){
+		blockLabel.append("div").html(c.replace("_","")+"%").style("width","60px").style("display","inline-block")
+		}
+	}
+
+	Promise.all([d3.csv("COVID-19_Vaccinations_in_the_United_States_County (1).csv"),d3.json("dots.geojson"),
+			 d3.json("gz_2010_us_outline_500k.json"),d3.json("gz_2010_us_040_00_500k.json")
+		 ])
+	.then(function(data){
+		//console.log(data)
+		var dots = data[1]
+		var vaccines = data[0]
+		var usOutline = data[2]
+		var stateOutline = data[3]
+		var vaccineDictionary = vaccineByFIPS(vaccines)
+		//console.log(vaccineDictionary)
+		var joinedData = joinRatesToDots(dots,vaccineDictionary)
+		//console.log(joinedData)
+		
+		drawMap(joinedData,usOutline,stateOutline)
+	})
+	
+	function vaccineByFIPS(vaccines){
+		var formatted = {}
+		for(var v in vaccines){
+			var fips = "_"+vaccines[v].FIPS
+			var entry = vaccines[v]
+			formatted[fips]=entry
+		}
+		return formatted
+	}
+	
+	function joinRatesToDots(dots,vaccines){
+		var newFeatures = []
+		for(var d in dots.features){
+			//console.log(dots.features[d])
+			var fips = "_"+dots.features[d].properties.GEOID
+			//console.log(fips)
+			var newFeature = dots.features[d]
+			var vaccineData = vaccines[fips]
+			if(vaccineData!=undefined){
+				for(var c in cats){
+					var cat = cats[c]
+					//console.log(cat)
+					//console.log(vaccineData[cat])
+				
+						newFeature.properties[cat]=parseFloat(vaccineData[cat])
+					}
+				}// else{
+// 					//console.log(fips)
+// 				}
+			
+			//break
+			newFeatures.push(newFeature)
+		}
+		dots.features = newFeatures
+		return dots
+	}
+	
+	
+	function drawMap(data,usOutline,stateOutline){
+		mapboxgl.accessToken = 'pk.eyJ1IjoiYzRzci1nc2FwcCIsImEiOiJja2J0ajRtNzMwOHBnMnNvNnM3Ymw5MnJzIn0.fsTNczOFZG8Ik3EtO9LdNQ';
+	    const map = new mapboxgl.Map({
+	        container: 'map', // container ID
+	        style: 'mapbox://styles/c4sr-gsapp/cl25fr4wl001i15qnxmelv27v', // custom style url from https://studio.mapbox.com/
+	        center: [-95.651,41.646], // starting position
+	        zoom: 3.8, // starting zoom
+			maxZoom:6
+	    });
+		map.on("load",function(){
+		
+			map.setPaintProperty("counties-au0n7n", 'line-color', "#ffffff");
+		
+	   		map.addSource('stateOutline', {
+	   		'type': 'geojson',
+				'data': stateOutline
+	   		})
+      		 map.addLayer({
+      		'id': "stateOutline",
+      		'type': 'line',
+      		'source': 'stateOutline', // reference the data source
+      		'layout': {
+   			
+      		},
+      		'paint': {
+				"line-color":"#000000",
+				"line-opacity":.2
+      		}
+      		});
+		
+	   		map.addSource('outline', {
+	   		'type': 'geojson',
+				'data': usOutline
+	   		})
+      		 map.addLayer({
+      		'id': "usOutline",
+      		'type': 'line',
+      		'source': 'outline', // reference the data source
+      		'layout': {
+   			
+      		},
+      		'paint': {
+				"line-color":"#000000",
+				"line-opacity":.5
+      		}
+      		});
+			
+		
+   		map.addSource('dots', {
+   		'type': 'geojson',
+   		'data': data
+   		})
+			var opacityScale = {
+		 	    property: "DN",
+		 	    stops: [
+					 [0,0],
+					 [1,.2],
+					 [1000,.8],
+					[8000,1]
+					 ]
+			}
+ 	    var radiusScale = {
+ 	    property: "DN",
+ 	    stops: radiusStops
+			 	    }
+	 
+	 
+					var radiusZoomScale = {
+						'base': 4,
+						'stops': [
+						[4, 4],
+						[22, 200]
+						]
+					}
+					var colorScale={
+						property:currentCat,
+						stops:[
+							[0,"#c77560"],
+ 							[30, "#dba788"],
+ 							[40, "#efdbcb"],
+ 							[50,"#b3d0c7"],
+							[60,"#6fa194"],
+							[70,"#2f7264"],
+							
+							
+						]
+					}
+   		 map.addLayer({
+   		'id': "dots",
+   		'type': 'circle',
+   		'source': 'dots', // reference the data source
+   		'layout': {
+   			
+   		},
+   		'paint': {
+			"circle-opacity":.8,//opacityScale,
+			'circle-radius':radiusScale,//radiusZoomScale,//4,//
+			"circle-color":colorScale
+   		}
+   		});
+		
+		
+		map.on("mouseenter","dots",function(d){
+			console.log(d)
+			var popDensity = d.features[0].properties["DN"]
+			var county = d.features[0].properties["Geo_QNAME"]
+			var coords = d.lngLat
+			var seriesCompleteRate = d.features[0].properties["Series_Complete_Pop_Pct"]
+			var boosterRate = d.features[0].properties["Booster_Doses_Vax_Pct"]
+			//var popEstimate = popDensity*15*15
+			d3.select("#popup").html("This 30km by 30km area centered at "+coords+"<br>"
+				+"in "+county+"<br>"
+				+"has population density of "+popDensity+" persons/km<br> and is "
+				+seriesCompleteRate+"% vaccinated<br>"
+				+boosterRate+"% boosted <br>"
+				+".")
+		})
+		map.on("mouseout","dots",function(d){
+			d3.select("#popup").html("")
+		})
+		})
+	}
+	
+	
+	
+</script>
+
+</body>
+</html>
